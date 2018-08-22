@@ -14,7 +14,7 @@ from torchvision import datasets, transforms, models
 default_arch = "vgg16"
 default_learning_rate = 0.01
 
-input_nodes = {"vgg16": 25088}
+input_nodes = {"vgg16": 25088, "densenet121": 1024, "alexnet": 9216}
 default_hidden_units = 512
 default_output_nodes = 102
 
@@ -22,6 +22,7 @@ default_epochs = 20
 
 mean = [0.485, 0.456, 0.406]
 std = [0.229, 0.224, 0.225]
+
 
 def load_data(data_dir):
     train_dir = data_dir + '/train'
@@ -31,7 +32,7 @@ def load_data(data_dir):
                                            transforms.RandomResizedCrop(224),
                                            transforms.RandomHorizontalFlip(),
                                            transforms.ToTensor(),
-                                           transforms.Normalize(mean,std)])
+                                           transforms.Normalize(mean, std)])
     valid_transforms = transforms.Compose([transforms.Resize(256),
                                            transforms.CenterCrop(224),
                                            transforms.ToTensor(),
@@ -40,18 +41,19 @@ def load_data(data_dir):
                                           transforms.CenterCrop(224),
                                           transforms.ToTensor(),
                                           transforms.Normalize(mean, std)])
-    traindatasets = datasets.ImageFolder(train_dir, transform = train_transforms)
-    validatasets = datasets.ImageFolder(valid_dir, transform = valid_transforms)
-    testdatasets = datasets.ImageFolder(test_dir, transform = test_transforms)
+    traindatasets = datasets.ImageFolder(train_dir, transform=train_transforms)
+    validatasets = datasets.ImageFolder(valid_dir, transform=valid_transforms)
+    testdatasets = datasets.ImageFolder(test_dir, transform=test_transforms)
 
-    trainloaders = torch.utils.data.DataLoader(traindatasets, batch_size = 64, shuffle = True)
-    validloaders = torch.utils.data.DataLoader(validatasets, batch_size = 64)
-    testloaders = torch.utils.data.DataLoader(testdatasets, batch_size = 64)
+    trainloaders = torch.utils.data.DataLoader(traindatasets, batch_size=64, shuffle=True)
+    validloaders = torch.utils.data.DataLoader(validatasets, batch_size=64)
+    testloaders = torch.utils.data.DataLoader(testdatasets, batch_size=64)
 
     return trainloaders, validloaders, testloaders
 
+
 def get_model(arch, hidden_units, output_nodes):
-    model = getattr(models, arch)(pretrained = True)
+    model = getattr(models, arch)(pretrained=True)
     for param in model.parameters():
         param.requires_grad = False
 
@@ -60,14 +62,16 @@ def get_model(arch, hidden_units, output_nodes):
         ('relu', nn.ReLU()),
         ('dropout', nn.Dropout(0.5)),
         ('fc2', nn.Linear(hidden_units, output_nodes)),
-        ('output', nn.LogSoftmax(dim = 1))
+        ('output', nn.LogSoftmax(dim=1))
     ]))
 
     model.classifier = classifier
 
     return model
 
-def train(data_dir = None, save_dir = None, arch = "vgg16", learning_rate = 0.01, hidden_units = 512, epochs = 20, enable_gpu = False):
+
+def train(data_dir=None, save_dir=None, arch="vgg16", learning_rate=0.01, hidden_units=512, epochs=20,
+          enable_gpu=False):
     print("Begin train...")
     print_every = 20
     steps = 0
@@ -86,7 +90,6 @@ def train(data_dir = None, save_dir = None, arch = "vgg16", learning_rate = 0.01
     else:
         model.cpu()
         print("We are on CPU")
-
 
     for e in range(epochs):
 
@@ -107,7 +110,8 @@ def train(data_dir = None, save_dir = None, arch = "vgg16", learning_rate = 0.01
             outputs = model.forward(inputs)
             loss = criterion(outputs, labels)
             optimizer.step()
-            training_loss += loss.data[0]
+
+            training_loss += loss.data.item()
 
             if steps % print_every == 0:
                 # Model in evaluation mode
@@ -120,7 +124,7 @@ def train(data_dir = None, save_dir = None, arch = "vgg16", learning_rate = 0.01
 
                 for jj, (inputs, labels) in enumerate(validloaders):
 
-                    inputs = Variable(inputs, requires_grad=False, volatile=True)
+                    inputs = Variable(inputs, requires_grad=False)
                     labels = Variable(labels)
 
                     if cuda:
@@ -130,7 +134,7 @@ def train(data_dir = None, save_dir = None, arch = "vgg16", learning_rate = 0.01
                     outputs = model.forward(inputs)
                     loss = criterion(outputs, labels)
 
-                    valid_loss += loss.data[0]
+                    valid_loss += loss.data.item()
 
                     ## Calculating the accuracy
                     # Model's output is log-softmax, take exponential to get the probabilities
@@ -187,6 +191,7 @@ def save_checkpoint(model, optimizer, train_data, arch, hidden_units, lr):
         print("File is saved")
         print(os.listdir())
 
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('data_dir')
@@ -202,8 +207,8 @@ def main():
 
     data_dir = args.data_dir
     save_dir = args.save_dir
-    arch = args.arch if args.arch != None else  default_arch
-    learning_rate = args.learning_rate if args.learning_rate != None  else default_learning_rate
+    arch = args.arch if args.arch != None else default_arch
+    learning_rate = float(args.learning_rate) if args.learning_rate != None else default_learning_rate
     hidden_units = args.hidden_units if args.hidden_units else default_hidden_units
     epochs = args.epochs if args.epochs != None else default_epochs
     enable_gpu = True if args.gpu != None else False
@@ -211,13 +216,12 @@ def main():
     print("data_dir ", data_dir)
     print("save_dir ", save_dir)
     print("arch ", arch)
-    print("learning_rate ", learning_rate)
+    print("learning_rate ", learning_rate, type(learning_rate))
     print("hidden_units ", hidden_units)
     print("epochs ", epochs)
 
     model, optimizer, train_data = train(data_dir, save_dir, arch, learning_rate, hidden_units, epochs, enable_gpu)
     save_checkpoint(models, optimizer, train_data, arch, hidden_units, learning_rate)
-
 
 
 main()

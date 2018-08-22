@@ -9,9 +9,8 @@ default_top_k = 5
 def load_model(filename = None):
     if filename != None:
         checkpoint = torch.load(filename)
-        optimizer = checkpoint['optimizer']
         model = checkpoint['model']
-        return model, optimizer
+        return model
 
 def load_cat_names(cat_to_name_filename):
     with open(cat_to_name_filename, 'r') as f:
@@ -117,18 +116,20 @@ def predict():
 
     model, optimizer = load_model(checkpoint_filename)
 
-    prop, label = make_prediction(image = image_filename, model = model, top_k = top_k, enable_gpu = enable_gpu)
-
-    print(prop, label)
+    props, labels = make_prediction(image = image_filename, model = model, top_k = top_k, enable_gpu = enable_gpu)
 
     if category_names_file != None:
 
         cat_to_name = load_cat_names(category_names_file)
 
-        print(cat_to_name)
+        for i in range(len(labels)):
+            print("{} {}".format(cat_to_name[labels[i]], props[i]))
+
+    else:
+        for i in range(len(labels)):
+            print("{} {}".format(labels[i], props[i]))
 
 predict()
-
 
 
 
