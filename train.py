@@ -7,13 +7,13 @@ import numpy as np
 from torch import nn
 from torch import optim
 from torch.autograd import Variable
-import torch.nn.functional as F
 from collections import OrderedDict
 from torchvision import datasets, transforms, models
 
 default_arch = "vgg16"
 default_learning_rate = 0.01
 
+available_archs = {"vgg16", "densenet121", "alexnet"}
 input_nodes = {"vgg16": 25088, "densenet121": 1024, "alexnet": 9216}
 default_hidden_units = 512
 default_output_nodes = 102
@@ -158,11 +158,11 @@ def train(data_dir=None, save_dir=None, arch="vgg16", learning_rate=0.01, hidden
 
                 # Model in training mode
                 model.train()
-    return model, optimizer
+    return model, optimizer, trainloaders
 
 
-def save_checkpoint(model, optimizer, train_data, arch, hidden_units, lr):
-    nn_filename = 'checkpoint.pth'
+def save_checkpoint(save_dir = None, model = None, optimizer = None, train_data = None, arch = "vgg16", hidden_units = default_hidden_units, lr = default_learning_rate):
+    nn_filename = save_dir.join('checkpoint.pth') if save_dir != None else 'checkpoint.pth'
     checkpoint = {
         'model': model.state_dict(),
         'optimizer': optimizer.state_dict(),
@@ -196,11 +196,11 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('data_dir')
     parser.add_argument('--save_dir')
-    parser.add_argument('--arch')
-    parser.add_argument('--learning_rate')
-    parser.add_argument('--hidden_units')
-    parser.add_argument('--epochs')
-    parser.add_argument('--top_k')
+    parser.add_argument('--arch', choices = available_archs)
+    parser.add_argument('--learning_rate', type= float)
+    parser.add_argument('--hidden_units', type = int)
+    parser.add_argument('--epochs', type = int)
+    parser.add_argument('--top_k', type = int)
     parser.add_argument('--gpu', default=True, nargs='?')
 
     args = parser.parse_args()
@@ -221,7 +221,7 @@ def main():
     print("epochs ", epochs)
 
     model, optimizer, train_data = train(data_dir, save_dir, arch, learning_rate, hidden_units, epochs, enable_gpu)
-    save_checkpoint(models, optimizer, train_data, arch, hidden_units, learning_rate)
+    save_checkpoint(save_dir, model, optimizer, train_data, arch, hidden_units, learning_rate)
 
 
 main()

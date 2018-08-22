@@ -1,16 +1,24 @@
 import argparse
 import torch
+from torch import optim
 from torch.autograd import Variable
+from torchvision import datasets, transforms, models
 import json
 import numpy as np
+from PIL import Image
 
 default_top_k = 5
 
 def load_model(filename = None):
     if filename != None:
         checkpoint = torch.load(filename)
-        model = checkpoint['model']
-        return model
+        arch = checkpoint['arch']
+        model = getattr(models, arch)(pretrained=True)
+        model.classifier = checkpoint['classifier']
+        model.load_state_dict(checkpoint['model'])
+        optimizer = optim.Adam(model.classifier.parameters(), checkpoint['lr'])
+        model.class_to_idx = checkpoint['class_to_idx']
+        return model, optimizer
 
 def load_cat_names(cat_to_name_filename):
     with open(cat_to_name_filename, 'r') as f:
@@ -28,9 +36,24 @@ def process_image(image):
     '''
     im = Image.open(image)
 
-    im.resize(256, 256)
+    width, height = im.size
+
+    new_width = width
+
+    new_height = height
+
+    if width < height:
+        new_width = 256
+        new_height = 256 * height / width
+
+    else:
+        new_height = 256
+        new_width = 256 * width / height
+
+    im.resize(new_width, new_height)
 
     value = 0.5 * (256 - 224)
+
     im = im.crop((value, value, 256 - value, 256 - value))
 
     im = np.array(image) / 255
@@ -98,7 +121,7 @@ def predict():
 
     parser.add_argument('image')
     parser.add_argument('checkpoint')
-    parser.add_argument('--top_k')
+    parser.add_argument('--top_k', type = int)
     parser.add_argument('--category_names')
     parser.add_argument('--gpu', default=False, nargs='?')
 
